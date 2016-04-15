@@ -17,17 +17,12 @@ import time
 import sys, optparse
 import curses
 
-def cvfast_conv(image,psf):
+def fast_conv(image, psf):
     max_size = np.array([np.max([image.shape[0],psf.shape[0]]),np.max([image.shape[1],psf.shape[1]])])
-    n = cv2.getOptimalDFTSize(max_size[0]*2)
-    m = cv2.getOptimalDFTSize(max_size[1]*2)
-    imagePad=np.zeros((n,m))
-    imagePad[:image.shape[0],:image.shape[1]]=image
-
-    imageDirty=np.fft.irfft2(np.fft.rfft2(imagePad) * np.fft.rfft2(psf, imagePad.shape))
-    #print image.shape, psf.shape, n,m
+    n = int(2**np.ceil(np.log2(max_size[0])))
+    m = int(2**np.ceil(np.log2(max_size[1])))
+    imageDirty=np.fft.irfft2(np.fft.rfft2(image, (n,m)) * np.fft.rfft2(psf, (n,m)))
     return imageDirty[psf.shape[0]/2:image.shape[0]+psf.shape[0]/2,psf.shape[1]/2:image.shape[1]+psf.shape[1]/2]
-    #return imagePad
 
 def main(stdscr):
     o = optparse.OptionParser()
@@ -49,18 +44,13 @@ def main(stdscr):
     cv2.namedWindow("Observed Image", cv2.CV_WINDOW_AUTOSIZE)
 
     cam0 = cv2.VideoCapture(CAMERA_DEVICE_INDEX)
-    cam0.read()
-    time.sleep(1)
     
     if opts.input is None:
         target_image = cv2.imread('/home/griffin/Downloads/interactiveInterferometer/astro_test_image.jpg')
     else:
         target_image=cv2.imread(opts.input)
     target_img_grey = cv2.cvtColor(target_image,cv2.COLOR_BGR2GRAY)
-    target_img_lying = target_img_grey.copy() # show this image to the user.
-    # Real computation is done with a saturated image
-    target_img_grey[target_img_grey>100] = 255
-    target_img_grey[target_img_grey<255] = 0
+    cv2.imshow("Target Image", target_img_grey)
     
     RESCALE_FACTOR=opts.res #decrease to change the effective resolution
     ysize=480
@@ -81,7 +71,16 @@ def main(stdscr):
     stdscr.addstr('Controls: Quit (q), Pause (p), Toggle Persistence (r)\n')
     persistence = False
     while(True):
-        rv, layout_img = cam0.read()
+        # Grab 4 images. The images are buffered, so this helps
+        # get one that is relatively recent. My cv2 doesn't
+        # seem to support reducing the size of the buffer.
+        for i in range(4):
+            #t0  = time.time()
+            rv, layout_img = cam0.read()
+            #t1 = time.time()
+            #elapsed = t1-t0
+            #stdscr.addstr('Capture %d took %.3f seconds\n'%(i,elapsed))
+          
     
         layout_img_grey = cv2.cvtColor(layout_img, cv2.COLOR_BGR2GRAY)
     
@@ -120,14 +119,12 @@ def main(stdscr):
             psf *= (gaussGrid/psf.max()) #apply a Gaussian taper to the PSF
     
         #target_arr = target_img_grey[:,:]
-        #dirty_arr = cvfast_conv(target_arr,psf)
-        dirty_arr = cvfast_conv(target_img_lying, psf)
+        dirty_arr = fast_conv(target_img_grey, psf)
         
         if dirty_arr.max() != 0:
             dirty_arr /= dirty_arr.max()
 
         cv2.imshow("Antenna Layout",layout_img_grey)
-        cv2.imshow("Target Image", target_img_lying)
         cv2.imshow("Point Spread",psf)
         cv2.imshow("Observed Image",dirty_arr)
     
