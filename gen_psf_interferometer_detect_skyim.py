@@ -99,7 +99,7 @@ def main(stdscr):
         #   param2: The smaller it is, the more false circles may be detected.
         #   minRadius: Minimum circle radius
         #   maxRadius: Maximum circle radius
-        circles = cv2.HoughCircles(layout_img_grey, cv2.cv.CV_HOUGH_GRADIENT,2,10,None,100,50,5,30)
+        circles = cv2.HoughCircles(layout_img_grey, cv2.cv.CV_HOUGH_GRADIENT,2,50,None,100,40,15,30)
         if circles is not None:
             for cn,circle in enumerate(circles[0]):
                 x,y = circle[1],circle[0]
@@ -142,7 +142,7 @@ def main(stdscr):
                    if k2 != -1:
                        stdscr.addstr('Unpausing...\n')
                        break
-                   time.sleep(0.1)
+                   time.sleep(0.25)
            elif k == ord('r'):
                if persistence:
                    stdscr.addstr('Turning Persistence off\n')
